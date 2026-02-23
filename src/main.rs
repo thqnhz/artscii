@@ -48,6 +48,17 @@ fn detect_color_support() -> ColorMode {
     }
 }
 
+fn luminance(r: u8, g: u8, b: u8) -> f32 {
+    // Luminance fomula is found at https://en.wikipedia.org/wiki/Relative_luminance
+    0.2126_f32 * f32::from(r) + 0.7152_f32 * f32::from(g) + 0.0722_f32 * f32::from(b)
+}
+
+fn choose_glyph(r: u8, g: u8, b: u8, charset: &str) -> char {
+    let lum = luminance(r, g, b) / 255_f32;
+    let index = (lum * (charset.len() - 1) as f32).round() as usize;
+    charset.chars().nth(index).unwrap()
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -66,5 +77,6 @@ fn main() {
 
     println!("Color mode: {:?}", color_mode);
     println!("Charset used: {}", charset);
+    println!("Glyph used: {}", choose_glyph(132, 215, 50, charset));
 }
 
