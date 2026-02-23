@@ -1,12 +1,16 @@
-use clap::{Parser, ValueEnum};
+use clap::{ArgAction, Parser, ValueEnum};
 use supports_color::{on, Stream};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 struct Args {
-    /// Use detailed ASCII charset.
-    #[arg(short, long)]
-    detailed: bool,
+    /// Use detailed ASCII charset. Can be stacked twice
+    #[arg(
+        short,
+        long,
+        action = ArgAction::Count,
+    )]
+    detailed: u8,
 
     /// Color mode [auto, full, partial, none]
     #[arg(
@@ -53,6 +57,14 @@ fn main() {
         Some(mode) => mode,
     };
 
+    // The glyph sets are from https://inkmeascii.com/blog/best-ascii-characters/
+    let charset = match args.detailed {
+        0 => " .:-=+*#%@",
+        1 => " _.,-=+:;cba!?0123456789$W#@",
+        _ => " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+    };
+
     println!("Color mode: {:?}", color_mode);
+    println!("Charset used: {}", charset);
 }
 
