@@ -73,6 +73,7 @@ fn process(img: image::DynamicImage, mode: ColorMode, charset: &str) {
     let block_h = h / out_h;
     let area = (block_w * block_h) as u32;
 
+    let mut output = String::with_capacity((out_w * out_h) as usize);
     for block_y in 0..out_h {
         for block_x in 0..out_w {
             let mut sum_r = 0_u32;
@@ -96,10 +97,11 @@ fn process(img: image::DynamicImage, mode: ColorMode, charset: &str) {
             let avg_g = sum_g / area;
             let avg_b = sum_b / area;
             let glyph = choose_glyph(avg_r as u8, avg_g as u8, avg_b as u8, charset);
-            print!("{}", glyph);
+            output.push(glyph);
         }
-        println!();
+        output.push('\n');
     }
+    print!("{}", output);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
