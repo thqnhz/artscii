@@ -4,7 +4,10 @@ use supports_color::{on, Stream};
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 struct Args {
-    /// Use detailed ASCII charset. Can be stacked twice
+    /// Path to the image
+    image: std::path::PathBuf,
+
+    /// Use detailed ASCII charset. Can be stacked twice.
     #[arg(
         short,
         long,
@@ -59,7 +62,47 @@ fn choose_glyph(r: u8, g: u8, b: u8, charset: &str) -> char {
     charset.chars().nth(index).unwrap()
 }
 
-fn main() {
+fn process(img: image::DynamicImage, mode: ColorMode, charset: &str) {
+    let rgb = img.to_rgb8();
+    let (w, h) = rgb.dimensions();
+
+    let font_h_to_w_ratio = 2.5_f32;
+    let out_h = 25;
+    let out_w = (w as f32 * out_h as f32 * font_h_to_w_ratio / h as f32) as u32;
+    let block_w = w / out_w;
+    let block_h = h / out_h;
+    let area = (block_w * block_h) as u32;
+
+    for block_y in 0..out_h {
+        for block_x in 0..out_w {
+            let mut sum_r = 0_u32;
+            let mut sum_g = 0_u32;
+            let mut sum_b = 0_u32;
+
+            for per_y in 0..block_h {
+                for per_x in 0..block_w {
+                    let x = block_x * block_w + per_x;
+                    let y = block_y * block_h + per_y;
+
+                    let pixel = rgb.get_pixel(x, y);
+                    let [r, g, b] = pixel.0;
+                    sum_r += r as u32;
+                    sum_g += g as u32;
+                    sum_b += b as u32;
+                }
+            }
+
+            let avg_r = sum_r / area;
+            let avg_g = sum_g / area;
+            let avg_b = sum_b / area;
+            let glyph = choose_glyph(avg_r as u8, avg_g as u8, avg_b as u8, charset);
+            print!("{}", glyph);
+        }
+        println!();
+    }
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let color_mode = match args.color {
@@ -75,8 +118,8 @@ fn main() {
         _ => " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
     };
 
-    println!("Color mode: {:?}", color_mode);
-    println!("Charset used: {}", charset);
-    println!("Glyph used: {}", choose_glyph(132, 215, 50, charset));
+    let img = image::ImageReader::open(&args.image)?.decode()?;
+    process(img, color_mode, charset);
+    Ok(())
 }
 
