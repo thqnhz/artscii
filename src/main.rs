@@ -62,7 +62,27 @@ fn choose_glyph(r: u8, g: u8, b: u8, charset: &str) -> char {
     charset.chars().nth(index).unwrap()
 }
 
-fn process(img: image::DynamicImage, mode: ColorMode, charset: &str) {
+fn ansi256(r: u8, g: u8, b: u8) -> String {
+    let r6 = (r as u16 * 5 / 255) as u16;
+    let g6 = (g as u16 * 5 / 255) as u16;
+    let b6 = (b as u16 * 5 / 255) as u16;
+    let code = 16 + 36 * r6 + 6 * g6 + b6;
+    format!("\x1b[38;5;{}m", code)
+}
+
+fn ansi_truecolor(r: u8, g: u8, b: u8) -> String {
+    format!("\x1b[38;2;{};{};{}m", r, g, b)
+}
+
+fn choose_ansi(r: u8, g: u8, b: u8, color_mode: &ColorMode) -> String {
+    match color_mode {
+        ColorMode::Full => ansi_truecolor(r, g, b),
+        ColorMode::Partial => ansi256(r, g, b),
+        _ => "".to_string()
+    }
+}
+
+fn process(img: image::DynamicImage, color_mode: ColorMode, charset: &str) {
     let rgb = img.to_rgb8();
     let (w, h) = rgb.dimensions();
 
@@ -73,7 +93,14 @@ fn process(img: image::DynamicImage, mode: ColorMode, charset: &str) {
     let block_h = h / out_h;
     let area = (block_w * block_h) as u32;
 
-    let mut output = String::with_capacity((out_w * out_h) as usize);
+    let byte_per_char = match color_mode {
+        ColorMode::Full => 32,
+        ColorMode::Partial => 16,
+        _ => 1,
+    };
+    let mut output = String::with_capacity((out_w * out_h * out_h * byte_per_char) as usize);
+
+    let mut last_ansi = String::with_capacity(byte_per_char as usize);
     for block_y in 0..out_h {
         for block_x in 0..out_w {
             let mut sum_r = 0_u32;
@@ -93,14 +120,22 @@ fn process(img: image::DynamicImage, mode: ColorMode, charset: &str) {
                 }
             }
 
-            let avg_r = sum_r / area;
-            let avg_g = sum_g / area;
-            let avg_b = sum_b / area;
-            let glyph = choose_glyph(avg_r as u8, avg_g as u8, avg_b as u8, charset);
+            let avg_r = (sum_r / area) as u8;
+            let avg_g = (sum_g / area) as u8;
+            let avg_b = (sum_b / area) as u8;
+            let glyph = choose_glyph(avg_r, avg_g, avg_b, charset);
+            let ansi = choose_ansi(avg_r, avg_g, avg_b, &color_mode);
+            if ansi != last_ansi {
+                output.push_str(&ansi);
+                last_ansi = ansi;
+            }
             output.push(glyph);
         }
         output.push('\n');
     }
+    let reset = "\x1b[0m";
+    output.push_str(reset);
+
     print!("{}", output);
 }
 
