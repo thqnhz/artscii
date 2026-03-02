@@ -194,6 +194,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         out_w = (out_h as f32 * resolution) as u32;
     } else if out_h == 0 {
         out_h = (out_w as f32 / resolution) as u32;
+    } else if out_w > rgb.width() || out_h > rgb.height() {
+        out_w = rgb.width();
+        out_h = rgb.height();
     }
 
     process(rgb, out_w, out_h, color_mode, charset);
