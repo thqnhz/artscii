@@ -186,10 +186,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let resolution = rgb.width() as f32 * font_h_to_w_ratio / rgb.height() as f32;
     if out_w == 0 && out_h == 0 {
         let size = terminal_size();
-        if let Some((Width(_), Height(h))) = size {
-            out_h = h as u32;
-        } else { out_h = 25_u32; }
+        let (term_w, term_h): (u32, u32);
+        if let Some((Width(w), Height(h))) = size {
+            term_w = w as u32;
+            term_h = h as u32;
+        } else {
+            term_h = 25_u32;
+            term_w = 0_u32;
+        }
+        out_h = term_h;
         out_w = (out_h as f32 * resolution) as u32;
+        if out_w > term_w {
+            out_w = term_w;
+            out_h = (out_w as f32 / resolution) as u32;
+        }
     } else if out_w == 0 {
         out_w = (out_h as f32 * resolution) as u32;
     } else if out_h == 0 {
