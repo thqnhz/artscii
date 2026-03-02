@@ -39,6 +39,7 @@ struct Args {
         short,
         long,
         default_value_t = 0,
+        hide_default_value = true,
         long_help = "The width of the output art\n\
                      \n\
                      By default the width will be scaled with the height based on the input aspect ratio.\n\
@@ -51,6 +52,7 @@ struct Args {
         short,
         long,
         default_value_t = 0,
+        hide_default_value = true,
         long_help = "The height of the output art\n\
                      \n\
                      By default the height will be scaled with the width based on the input aspect ratio.\n\
