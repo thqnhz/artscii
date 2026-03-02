@@ -1,5 +1,6 @@
 use clap::{ArgAction, Parser, ValueEnum};
 use supports_color::{on, Stream};
+use terminal_size::{Width, Height, terminal_size};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -184,7 +185,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let font_h_to_w_ratio = 2.5_f32;
     let resolution = rgb.width() as f32 * font_h_to_w_ratio / rgb.height() as f32;
     if out_w == 0 && out_h == 0 {
-        out_h = 25_u32;
+        let size = terminal_size();
+        if let Some((Width(_), Height(h))) = size {
+            out_h = h as u32;
+        } else { out_h = 25_u32; }
         out_w = (out_h as f32 * resolution) as u32;
     } else if out_w == 0 {
         out_w = (out_h as f32 * resolution) as u32;
