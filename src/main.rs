@@ -33,6 +33,30 @@ struct Args {
                      (default to auto when flag is passed without specifying value)."
     )]
     color: Option<ColorMode>,
+
+    /// Output art width
+    #[arg(
+        short,
+        long,
+        default_value_t = 0,
+        long_help = "The width of the output art\n\
+                     \n\
+                     By default the width will be scaled with the height based on the input aspect ratio.\n\
+                     Might squish the output art if both width and height are specified."
+    )]
+    width: u32,
+
+    /// Output art height
+    #[arg(
+        short,
+        long,
+        default_value_t = 0,
+        long_help = "The height of the output art\n\
+                     \n\
+                     By default the height will be scaled with the width based on the input aspect ratio.\n\
+                     Might squish the output art if both width and height are specified."
+    )]
+    height: u32,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -82,13 +106,8 @@ fn choose_ansi(r: u8, g: u8, b: u8, color_mode: &ColorMode) -> String {
     }
 }
 
-fn process(img: image::DynamicImage, color_mode: ColorMode, charset: &str) {
-    let rgb = img.to_rgb8();
+fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, charset: &str) {
     let (w, h) = rgb.dimensions();
-
-    let font_h_to_w_ratio = 2.5_f32;
-    let out_h = 25;
-    let out_w = (w as f32 * out_h as f32 * font_h_to_w_ratio / h as f32) as u32;
     let block_w = w / out_w;
     let block_h = h / out_h;
     let area = (block_w * block_h) as u32;
@@ -156,7 +175,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let img = image::ImageReader::open(&args.image)?.decode()?;
-    process(img, color_mode, charset);
+    let rgb = img.to_rgb8();
+    
+    let mut out_w = args.width;
+    let mut out_h = args.height;
+    let font_h_to_w_ratio = 2.5_f32;
+    let resolution = rgb.width() as f32 * font_h_to_w_ratio / rgb.height() as f32;
+    if out_w == 0 && out_h == 0 {
+        out_h = 25_u32;
+        out_w = (out_h as f32 * resolution) as u32;
+    } else if out_w == 0 {
+        out_w = (out_h as f32 * resolution) as u32;
+    } else if out_h == 0 {
+        out_h = (out_w as f32 / resolution) as u32;
+    }
+
+    process(rgb, out_w, out_h, color_mode, charset);
     Ok(())
 }
 
