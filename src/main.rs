@@ -37,29 +37,37 @@ struct Args {
 
     /// Output art width
     #[arg(
-        short,
         long,
-        default_value_t = 0,
         hide_default_value = true,
         long_help = "The width of the output art\n\
                      \n\
                      By default the width will be scaled with the height based on the input aspect ratio.\n\
                      Might squish the output art if both width and height are specified."
     )]
-    width: u32,
+    width: Option<u32>,
 
     /// Output art height
     #[arg(
-        short,
         long,
-        default_value_t = 0,
         hide_default_value = true,
         long_help = "The height of the output art\n\
                      \n\
                      By default the height will be scaled with the width based on the input aspect ratio.\n\
                      Might squish the output art if both width and height are specified."
     )]
-    height: u32,
+    height: Option<u32>,
+
+    /// Dimension
+    #[arg(
+        long,
+        conflicts_with_all = ["width", "height"],
+        long_help = "The dimension of the output art\n\
+                     \n\
+                     Format: WxH
+                     \n\
+                     Mutually exclusive with width/height flag."
+    )]
+    dimension: Option<String>,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -76,6 +84,51 @@ fn detect_color_support() -> ColorMode {
         Some(_) => ColorMode::Partial,
         None => ColorMode::None,
     }
+}
+
+fn get_width_by_height(height: u32, aspect_ratio: f32) -> u32 {
+    (height as f32 * aspect_ratio) as u32
+}
+
+fn get_height_by_width(width: u32, aspect_ratio: f32) -> u32 {
+    (width as f32 / aspect_ratio) as u32
+}
+
+fn get_output_dimension(args: &Args, img_width: u32, img_height: u32) -> Option<(u32, u32)> {
+    let font_h_to_w_ratio = 2.5_f32;
+    let img_aspect_ratio = img_width as f32 * font_h_to_w_ratio / img_height as f32;
+
+    if let Some(dimension) = &args.dimension {
+        let (width, height) = dimension.split_once('x')?;
+        return Some((width.parse().ok()?, height.parse().ok()?));
+    } else if let Some(width) = args.width {
+        if let Some(height) = args.height {
+            return Some((width, height));
+        }
+        return Some((width, get_height_by_width(width, img_aspect_ratio)));
+    } else if let Some(height) = args.height {
+        return Some((get_width_by_height(height, img_aspect_ratio), height));
+    }
+    get_best_terminal_output_dimension(img_aspect_ratio)
+}
+
+fn get_best_terminal_output_dimension(img_aspect_ratio: f32) -> Option<(u32, u32)> {
+    let term_size = terminal_size();
+    let (term_w, term_h): (u32, u32);
+    if let Some((Width(w), Height(h))) = term_size {
+        term_w = w as u32;
+        term_h = h as u32;
+    } else {
+        term_w = 25_u32;
+        term_h = 0_u32;
+    }
+    let mut width = term_w;
+    let mut height = get_height_by_width(width, img_aspect_ratio);
+    if height > term_h {
+        height = term_h;
+        width = get_width_by_height(height, img_aspect_ratio);
+    }
+    Some((width, height))
 }
 
 fn luminance(r: u8, g: u8, b: u8) -> f32 {
@@ -167,19 +220,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let color_mode = match args.color {
         None => ColorMode::None,
         Some(ColorMode::Auto) => detect_color_support(),
-        Some(mode) => mode,
+        Some(ref mode) => mode.clone(),
     };
 
     // The glyph sets are from https://inkmeascii.com/blog/best-ascii-characters/
     let charset = match args.detailed {
-        0 => " .:-=+*#%@",
-        1 => " _.,-=+:;cba!?0123456789$W#@",
-        _ => " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+        0 => ".:-=+*#%@",
+        1 => "_.,-=+:;cba!?0123456789$W#@",
+        _ => ".'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
     };
 
     let img = image::ImageReader::open(&args.image)?.decode()?;
     let rgb = img.to_rgb8();
-    
+
+    if let Some((out_w, out_h)) = get_output_dimension(&args, rgb.width(), rgb.height()) {
+        process(rgb, out_w, out_h, color_mode, charset);
+    }
+    Ok(())
+}
+/*
+fn tmp() -> Box<dyn std::error::Error> {
     let mut out_w = args.width;
     let mut out_h = args.height;
     let font_h_to_w_ratio = 2.5_f32;
@@ -212,4 +272,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     process(rgb, out_w, out_h, color_mode, charset);
     Ok(())
 }
+*/
 
