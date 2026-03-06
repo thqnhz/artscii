@@ -238,39 +238,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
-/*
-fn tmp() -> Box<dyn std::error::Error> {
-    let mut out_w = args.width;
-    let mut out_h = args.height;
-    let font_h_to_w_ratio = 2.5_f32;
-    let resolution = rgb.width() as f32 * font_h_to_w_ratio / rgb.height() as f32;
-    if out_w == 0 && out_h == 0 {
-        let size = terminal_size();
-        let (term_w, term_h): (u32, u32);
-        if let Some((Width(w), Height(h))) = size {
-            term_w = w as u32;
-            term_h = h as u32;
-        } else {
-            term_h = 25_u32;
-            term_w = 0_u32;
-        }
-        out_h = term_h;
-        out_w = (out_h as f32 * resolution) as u32;
-        if out_w > term_w {
-            out_w = term_w;
-            out_h = (out_w as f32 / resolution) as u32;
-        }
-    } else if out_w == 0 {
-        out_w = (out_h as f32 * resolution) as u32;
-    } else if out_h == 0 {
-        out_h = (out_w as f32 / resolution) as u32;
-    } else if out_w > rgb.width() || out_h > rgb.height() {
-        out_w = rgb.width();
-        out_h = rgb.height();
-    }
-
-    process(rgb, out_w, out_h, color_mode, charset);
-    Ok(())
-}
-*/
 
