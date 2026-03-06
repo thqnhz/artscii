@@ -35,35 +35,30 @@ struct Args {
     )]
     color: Option<ColorMode>,
 
-    /// Output art width
+    /// Output width
     #[arg(
         long,
-        hide_default_value = true,
-        long_help = "The width of the output art\n\
+        long_help = "Output width\n\
                      \n\
-                     By default the width will be scaled with the height based on the input aspect ratio.\n\
-                     Might squish the output art if both width and height are specified."
+                     If not specified, output width will be calculated based on image aspect ratio."
     )]
     width: Option<u32>,
 
-    /// Output art height
+    /// Output height
     #[arg(
         long,
-        hide_default_value = true,
-        long_help = "The height of the output art\n\
+        long_help = "Output height\n\
                      \n\
-                     By default the height will be scaled with the width based on the input aspect ratio.\n\
-                     Might squish the output art if both width and height are specified."
+                     If not specified, output height will be calculated based on image aspect ratio."
     )]
     height: Option<u32>,
 
-    /// Dimension
+    /// Output dimension
     #[arg(
         long,
         conflicts_with_all = ["width", "height"],
-        long_help = "The dimension of the output art\n\
-                     \n\
-                     Format: WxH
+        value_name = "WxH",
+        long_help = "Output dimension\n\
                      \n\
                      Mutually exclusive with width/height flag."
     )]
