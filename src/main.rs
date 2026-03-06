@@ -235,6 +235,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rgb = img.to_rgb8();
 
     if let Some((out_w, out_h)) = get_output_dimension(&args, rgb.width(), rgb.height()) {
+        if out_w >= rgb.width() || out_h >= rgb.height() {
+            return Err("Height/Width value is bigger than the image dimension.".into());
+        }
         let output = process(rgb, out_w, out_h, color_mode, charset);
         if let Some(out_file) = &args.output {
             std::fs::write(out_file, output)?;
