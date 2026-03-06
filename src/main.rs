@@ -68,6 +68,13 @@ struct Args {
                      Mutually exclusive with width/height flag."
     )]
     dimension: Option<String>,
+
+    /// Output file
+    #[arg(
+        short,
+        long,
+    )]
+    output: Option<std::path::PathBuf>,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -162,7 +169,7 @@ fn choose_ansi(r: u8, g: u8, b: u8, color_mode: &ColorMode) -> String {
     }
 }
 
-fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, charset: &str) {
+fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, charset: &str) -> String {
     let (w, h) = rgb.dimensions();
     let block_w = w / out_w;
     let block_h = h / out_h;
@@ -210,8 +217,7 @@ fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, 
     }
     let reset = "\x1b[0m";
     output.push_str(reset);
-
-    print!("{}", output);
+    output
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -234,7 +240,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rgb = img.to_rgb8();
 
     if let Some((out_w, out_h)) = get_output_dimension(&args, rgb.width(), rgb.height()) {
-        process(rgb, out_w, out_h, color_mode, charset);
+        let output = process(rgb, out_w, out_h, color_mode, charset);
+        if let Some(out_file) = &args.output {
+            std::fs::write(out_file, output)?;
+            return Ok(());
+        }
+        println!("{}", output);
     }
     Ok(())
 }
