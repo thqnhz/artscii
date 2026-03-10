@@ -72,12 +72,23 @@ struct Args {
     output: Option<std::path::PathBuf>,
 }
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, Default)]
 enum ColorMode {
     None,
     Full,
     Partial,
-    Auto,
+    #[default] Auto,
+}
+
+#[derive(Default)]
+struct Artscii {
+    color_mode: ColorMode,
+    charset: String,
+    image: image::RgbImage,
+    aspect_ratio: f32,
+    output_width: u32,
+    output_height: u32,
+    output: String,
 }
 
 fn detect_color_support() -> ColorMode {
@@ -94,6 +105,15 @@ fn get_width_by_height(height: u32, aspect_ratio: f32) -> u32 {
 
 fn get_height_by_width(width: u32, aspect_ratio: f32) -> u32 {
     (width as f32 / aspect_ratio) as u32
+}
+
+fn split_dimension_arg(dimension: Option<&str>) -> Result<(u32, u32), ()> {
+    let dimension = dimension.ok_or(())?;
+    let (w, h) = dimension.split_once('x').ok_or(())?;
+    Ok((
+        w.parse().map_err(|_| ())?,
+        h.parse().map_err(|_| ())?
+    ))
 }
 
 fn get_output_dimension(args: &Args, img_width: u32, img_height: u32) -> Option<(u32, u32)> {
@@ -218,33 +238,39 @@ fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    let color_mode = match args.color {
+    let mut artscii = Artscii::default();
+
+    artscii.color_mode = match args.color {
         None => ColorMode::None,
         Some(ColorMode::Auto) => detect_color_support(),
-        Some(ref mode) => mode.clone(),
+        Some(mode) => mode,
     };
 
     // The glyph sets are from https://inkmeascii.com/blog/best-ascii-characters/
-    let charset = match args.detailed {
-        0 => ".:-=+*#%@",
-        1 => "_.,-=+:;cba!?0123456789$W#@",
-        _ => ".'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+    artscii.charset = match args.detailed {
+        0 => ".:-=+*#%@".to_string(),
+        1 => "_.,-=+:;cba!?0123456789$W#@".to_string(),
+        _ => ".'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$".to_string(),
     };
 
-    let img = image::ImageReader::open(&args.image)?.decode()?;
-    let rgb = img.to_rgb8();
+    artscii.image = image::ImageReader::open(&args.image)?.decode()?.to_rgb8();
 
-    if let Some((out_w, out_h)) = get_output_dimension(&args, rgb.width(), rgb.height()) {
-        if out_w >= rgb.width() || out_h >= rgb.height() {
-            return Err("Height/Width value is bigger than the image dimension.".into());
-        }
-        let output = process(rgb, out_w, out_h, color_mode, charset);
-        if let Some(out_file) = &args.output {
-            std::fs::write(out_file, output)?;
-            return Ok(());
-        }
-        println!("{}", output);
+    if let Ok((out_w, out_h)) = split_dimension_arg(args.dimension.as_deref()) {
+        artscii.output_width = out_w;
+        artscii.output_height = out_h;
     }
+
+    //if let Some((out_w, out_h)) = get_output_dimension(&args, rgb.width(), rgb.height()) {
+    //    if out_w >= rgb.width() || out_h >= rgb.height() {
+    //        return Err("Height/Width value is bigger than the image dimension.".into());
+    //    }
+    //    let output = process(rgb, out_w, out_h, color_mode, charset);
+    //    if let Some(out_file) = &args.output {
+    //        std::fs::write(out_file, output)?;
+    //        return Ok(());
+    //    }
+    //    println!("{}", output);
+    //}
     Ok(())
 }
 
