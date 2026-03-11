@@ -85,7 +85,6 @@ struct Artscii {
     color_mode: ColorMode,
     charset: String,
     image: image::RgbImage,
-    aspect_ratio: f32,
     output_width: u32,
     output_height: u32,
     output: String,
@@ -116,19 +115,16 @@ fn split_dimension_arg(dimension: Option<&str>) -> Result<(u32, u32), ()> {
     ))
 }
 
-fn get_output_dimension(args: &Args, img_width: u32, img_height: u32) -> Option<(u32, u32)> {
+fn get_output_dimension(artscii: &Artscii, arg_width: Option<u32>, arg_height: Option<u32>) -> Option<(u32, u32)> {
     let font_h_to_w_ratio = 2.5_f32;
-    let img_aspect_ratio = img_width as f32 * font_h_to_w_ratio / img_height as f32;
+    let img_aspect_ratio = artscii.image.width() as f32 * font_h_to_w_ratio / artscii.image.height() as f32;
 
-    if let Some(dimension) = &args.dimension {
-        let (width, height) = dimension.split_once('x')?;
-        return Some((width.parse().ok()?, height.parse().ok()?));
-    } else if let Some(width) = args.width {
-        if let Some(height) = args.height {
+    if let Some(width) = arg_width {
+        if let Some(height) = arg_height {
             return Some((width, height));
         }
         return Some((width, get_height_by_width(width, img_aspect_ratio)));
-    } else if let Some(height) = args.height {
+    } else if let Some(height) = arg_height {
         return Some((get_width_by_height(height, img_aspect_ratio), height));
     }
     get_best_terminal_output_dimension(img_aspect_ratio)
@@ -184,22 +180,22 @@ fn choose_ansi(r: u8, g: u8, b: u8, color_mode: &ColorMode) -> String {
     }
 }
 
-fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, charset: &str) -> String {
-    let (w, h) = rgb.dimensions();
-    let block_w = w / out_w;
-    let block_h = h / out_h;
+fn process(artscii: &mut Artscii) {
+    let (w, h) = artscii.image.dimensions();
+    let block_w = w / artscii.output_width;
+    let block_h = h / artscii.output_height;
     let area = (block_w * block_h) as u32;
 
-    let byte_per_char = match color_mode {
+    let byte_per_char = match artscii.color_mode {
         ColorMode::Full => 32,
         ColorMode::Partial => 16,
         _ => 1,
     };
-    let mut output = String::with_capacity((out_w * out_h * out_h * byte_per_char) as usize);
+    artscii.output = String::with_capacity((artscii.output_width * artscii.output_height * artscii.output_height * byte_per_char) as usize);
 
     let mut last_ansi = String::with_capacity(byte_per_char as usize);
-    for block_y in 0..out_h {
-        for block_x in 0..out_w {
+    for block_y in 0..artscii.output_height {
+        for block_x in 0..artscii.output_width {
             let mut sum_r = 0_u32;
             let mut sum_g = 0_u32;
             let mut sum_b = 0_u32;
@@ -209,7 +205,7 @@ fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, 
                     let x = block_x * block_w + per_x;
                     let y = block_y * block_h + per_y;
 
-                    let pixel = rgb.get_pixel(x, y);
+                    let pixel = artscii.image.get_pixel(x, y);
                     let [r, g, b] = pixel.0;
                     sum_r += r as u32;
                     sum_g += g as u32;
@@ -220,19 +216,18 @@ fn process(rgb: image::RgbImage, out_w: u32, out_h: u32, color_mode: ColorMode, 
             let avg_r = (sum_r / area) as u8;
             let avg_g = (sum_g / area) as u8;
             let avg_b = (sum_b / area) as u8;
-            let glyph = choose_glyph(avg_r, avg_g, avg_b, charset);
-            let ansi = choose_ansi(avg_r, avg_g, avg_b, &color_mode);
+            let glyph = choose_glyph(avg_r, avg_g, avg_b, &artscii.charset);
+            let ansi = choose_ansi(avg_r, avg_g, avg_b, &artscii.color_mode);
             if ansi != last_ansi {
-                output.push_str(&ansi);
+                artscii.output.push_str(&ansi);
                 last_ansi = ansi;
             }
-            output.push(glyph);
+            artscii.output.push(glyph);
         }
-        output.push('\n');
+        artscii.output.push('\n');
     }
     let reset = "\x1b[0m";
-    output.push_str(reset);
-    output
+    artscii.output.push_str(reset);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -258,19 +253,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Ok((out_w, out_h)) = split_dimension_arg(args.dimension.as_deref()) {
         artscii.output_width = out_w;
         artscii.output_height = out_h;
+    } else if let Some((out_w, out_h)) = get_output_dimension(&artscii, args.width, args.height) {
+        if out_w > artscii.image.width() || out_h > artscii.image.height() {
+            return Err("Height/Width value is bigger than the image resolution.".into());
+        }
+        artscii.output_width = out_w;
+        artscii.output_height = out_h;
     }
-
-    //if let Some((out_w, out_h)) = get_output_dimension(&args, rgb.width(), rgb.height()) {
-    //    if out_w >= rgb.width() || out_h >= rgb.height() {
-    //        return Err("Height/Width value is bigger than the image dimension.".into());
-    //    }
-    //    let output = process(rgb, out_w, out_h, color_mode, charset);
-    //    if let Some(out_file) = &args.output {
-    //        std::fs::write(out_file, output)?;
-    //        return Ok(());
-    //    }
-    //    println!("{}", output);
-    //}
+    process(&mut artscii);
+    if let Some(out_file) = &args.output {
+        std::fs::write(out_file, artscii.output)?;
+        return Ok(());
+    }
+    println!("{}", artscii.output);
     Ok(())
 }
 
